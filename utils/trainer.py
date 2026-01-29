@@ -6,14 +6,14 @@ import copy
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
 class Trainer:
-    def __init__(self,model, train_loader, test_loader, test_label, criterion, optimizer):
+    def __init__(self,model, train_loader, test_loader, test_label, loss_function, optimizer):
         self.model = model
         self.model.to(device)
         self.model = self.model.to(torch.float64)
         self.train_loader = train_loader
         self.test_loader = test_loader
         self.test_label = torch.Tensor(test_label.transpose())
-        self.criterion = criterion
+        self.loss_function = loss_function
         self.optimizer = optimizer
         self.best_model = None
         self.best_score = None
@@ -33,11 +33,15 @@ class Trainer:
             output = self.model(x)
             outputs.append(output)
             target.append(y)
-            (loss , p) = self.criterion(self.max_rul*output, self.max_rul*y,overestimation_penalty=self.overestimation_penalty)
+            (loss , p) = self.loss_function(self.max_rul*output, self.max_rul*y,overestimation_penalty=self.overestimation_penalty)
             loss.backward()
             self.optimizer.step()
             Loss.append(loss.item())
             penalty.append(p)
+            #if i % 50000 == 0:
+            #    break 
+
+
         loss_mean = sum(Loss)/len(Loss)
         overestimation_mean = sum(penalty)/len(penalty)
         print(f" --> train loss ( RMSE ) : {loss_mean:.4f} , score : {overestimation_mean:.4f} ")
@@ -55,7 +59,7 @@ class Trainer:
         out_batch_pre = torch.cat(prediction_list).detach().cpu().numpy()
         t_label = torch.cat(t_label).detach().cpu()
         prediction_tensor = torch.from_numpy(out_batch_pre)   
-        test_loss , overestimation_mean = self.criterion(prediction_tensor*self.max_rul, t_label*self.max_rul,mode="test",overestimation_penalty=self.overestimation_penalty)
+        test_loss , overestimation_mean = self.loss_function(prediction_tensor*self.max_rul, t_label*self.max_rul,mode="test",overestimation_penalty=self.overestimation_penalty)
         
         print(f'--> test_loss ( RMSE ) = {test_loss.item()} , score : {overestimation_mean:.4f} ')
         

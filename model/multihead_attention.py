@@ -48,14 +48,15 @@ class MultiHeadSelfAttention(nn.Module):
         # Define scaling factor for dot product attention
         self.scale = torch.sqrt(torch.FloatTensor([d_model // n_heads])).to(device).to(torch.float64)
         
-    def forward(self, x, encoder_output = None ,mask=None):
+    def forward(self, x, x_noised=None, encoder_output = None ,mask=None):
         batch_size = x.size(0)
-        
+        #print(f'x_noised  MHA: {x_noised}')  # Debugging line
         # Apply linear transformations to get queries, keys, and values
         if encoder_output is None:
-            Q = self.linear_q(x)
-            K = self.linear_k(x)
-            V = self.linear_v(x)
+            if x_noised is not None:
+                Q = self.linear_q(x_noised)
+                K = self.linear_k(x)
+                V = self.linear_v(x)
         else:
             Q = self.linear_q(x)
             K = self.linear_k(encoder_output)
@@ -74,16 +75,12 @@ class MultiHeadSelfAttention(nn.Module):
         
         # Apply softmax activation
         attention = torch.softmax(scores, dim=-1)
-        
         # Apply dropout
         attention = self.dropout(attention)
-        
         # Compute weighted sum of values
         context = torch.matmul(attention, V)
-        
         # Concatenate and reshape the heads
         context = context.transpose(1,2).contiguous().view(batch_size, -1, self.n_heads * (self.d_model // self.n_heads))
-        
         # Apply output linear layer
         output = self.linear_out(context)
         

@@ -32,13 +32,20 @@ class EncoderLayer(nn.Module):
         # Define layer normalization layers
         self.norm1 = nn.LayerNorm(d_model)
         self.norm2 = nn.LayerNorm(d_model)
+
+        self.norm1_noised = nn.LayerNorm(d_model)
         
-    def forward(self, x, mask=None):
+    def forward(self, x, x_noised=None, mask=None):
+        #print(f'x_noised  EncoderLayer: {x_noised}')  # Debugging line
         # Apply layer normalization to input
         x_norm = self.norm1(x)
-        
+        if x_noised is not None:
+            x_noised_norm = self.norm1_noised(x_noised)
+        else :
+            x_noised_norm = None
+        #print(f'x_noised_norm  EncoderLayer: {x_noised_norm}')  # Debugging line
         # Apply multi-head self-attention
-        self_attn_output = self.self_attn(x_norm, mask=mask)
+        self_attn_output = self.self_attn(x_norm, x_noised=x_noised_norm, mask=mask)
         
         # Add residual connection and apply layer normalization
         x1 = self.norm2(x + self_attn_output)
@@ -64,11 +71,16 @@ class TransformerEncoder(nn.Module):
             EncoderLayer(n_heads, d_model, ff_hidden, dropout) for _ in range(n_layers)
         ])
         
-    def forward(self, x, mask=None):
+    def forward(self, x, x_noised=None, mask=None):
         # Apply positional encoding to input
         
         x = self.pos_encoding(x)
+        #print(f'shape x before encoder: {x.shape}')  # Debugging line
+        #print(f'x_noised before encoder: {x_noised.shape if x_noised is not None else None}')  # Debugging line
+        if x_noised is not None:
+            x_noised = self.pos_encoding(x_noised)
+            x = self.encoder_layers[0](x, x_noised=x_noised, mask=mask)
         # Apply each encoder block in turn
-        for encoder_layer in self.encoder_layers:
+        for encoder_layer in self.encoder_layers[1:]:
             x = encoder_layer(x, mask=mask)
         return x
